@@ -1,6 +1,4 @@
-# Mini-SOAR Engine - Công cụ Tự động Hóa Phản ứng Bảo mật
-
-**Mini-SOAR** là một công cụ SOAR (Security Orchestration, Automation and Response) nhẹ, được thiết kế để tự động phát hiện và phản ứng với các sự kiện bảo mật từ Suricata IDS/IPS.
+# Hệ thống IDS/IPS sử dụng mã nguồn mở
 
 ## 📋 Tổng Quan Dự án
 
