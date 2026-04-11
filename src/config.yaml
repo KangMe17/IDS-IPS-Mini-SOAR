@@ -1,0 +1,167 @@
+# ==========================================
+# CẤU HÌNH MINI-SOAR ENGINE
+# ==========================================
+
+# --- Cài đặt chung hệ thống ---
+# Đường dẫn đến file log EVE của Suricata
+#eve_log: "/var/log/suricata/eve.json"
+eve_log: "/var/log/suricata/eve.json"
+
+# Đường dẫn lưu Database (Script sẽ tự tạo thư mục nếu chưa có)
+db_path: "/var/lib/mini_soar/mini_soar.db"
+
+# Cổng cho API quản lý (Ví dụ: gọi /api/unban)
+http_api_port: 9000
+
+# Chế độ chạy thử (True = Chỉ in log, không chặn thật; False = Chặn thật)
+dry_run: false
+
+# --- Cấu hình Firewall ---
+# Sử dụng nftables (hiện đại) hay iptables (cũ). True = nftables
+use_nft: true
+
+# Thời gian chặn mặc định (giây). 3600 = 1 giờ
+ban_ttl: 3600
+
+# Chu kỳ kiểm tra để gỡ ban (giây)
+unban_check_interval: 30
+
+# --- Whitelist (Danh sách tin cậy) ---
+# Hỗ trợ cả IP đơn và Subnet (CIDR). Hệ thống sẽ KHÔNG chặn các IP này.
+whitelist:
+  - "127.0.0.1"
+  - "192.168.20.2"  # Máy nạn nhân (DVWA)
+  - "192.168.20.1"  # IP Gateway trong
+  - "192.168.10.1"  # IP Gateway ngoài
+  - "10.0.4.15"     # IP quản lý của bạn
+
+# --- Ignore List (Danh sách bỏ qua) ---
+# Nếu signature của cảnh báo chứa các từ khóa này, hệ thống sẽ lờ đi (Giảm nhiễu)
+ignore_keywords:
+  - "SURICATA STREAM"    # Lỗi gói tin
+  - "SURICATA TCP"
+  - "GPL ICMP"           # Ping thông thường
+  - "ICMP PING"
+  - "Generic Protocol Command Decode"
+
+# ==========================================
+# CẤU HÌNH CẢNH BÁO (NOTIFICATIONS)
+# ==========================================
+
+# 1. Telegram (Khuyên dùng - Nhanh)
+telegram:
+  enabled: true
+  token: "YOUR_TELEGRAM_TOKEN"  # Thay bằng token bot của bạn
+  chat_id: "YOUR_CHAT_ID"           # Thay bằng ID chat của bạn/group
+
+# 2. Email (SMTP - Tùy chọn)
+email:
+  smtp_server: "smtp.gmail.com"
+  smtp_port: 587
+  smtp_user: "YOUR_SMTP_USER"
+  smtp_password: "YOUR_SMTP_PASSWORD" # Mật khẩu ứng dụng (App Password)
+  mail_to: "YOUR_MAIL_TO"
+
+# ==========================================
+# RULES ENGINE (LUẬT XỬ LÝ ĐỘNG)
+# ==========================================
+# Hệ thống sẽ duyệt qua danh sách này từ trên xuống dưới.
+# Nếu cảnh báo khớp với "keywords", hành động tương ứng sẽ được thực thi.
+
+rules:
+  # 1. Chống SQL Injection
+  - name: "SQL Injection Attack"
+    keywords: 
+      - "SQL Error"
+      - "error in your SQL syntax"
+      - "SQL Errors in HTTP"
+      - "MySQL"
+      - "PostgreSQL"
+      - "MSSQL"
+      - "SQL Injection"
+      - "UNION SELECT"
+    action: "block_ip"
+    ttl: 7200                 # Chặn 2 giờ
+    quarantine: true          # Cách ly hoàn toàn IP nguồn
+    block_domain: true        # Chặn luôn domain đích (nếu có hostname)
+
+  # 2. Chống XSS (Cross Site Scripting)
+  - name: "XSS / Scripting"
+    keywords: 
+      - "Cross Site Scripting"
+      - "<script>"
+      - "XSS"
+      - "Script tag"
+    action: "block_ip"
+    ttl: 3600                 # Chặn 1 giờ
+
+  # 3. Chống RCE / Command Injection (Mức độ nguy hiểm cao)
+  - name: "RCE / Command Injection"
+    keywords: 
+      - "Command Injection"
+      - "Shellshock"
+      - "bash -c"
+      - "wget"
+      - "curl"
+      - "RCE"
+      - "CVE"
+    action: "block_ip"
+    ttl: 86400                # Chặn 24 giờ (1 ngày)
+    quarantine: true
+
+  # 4. Phát hiện dò quét (Scanning)
+  - name: "Scanning / Reconnaissance"
+    keywords: 
+      - "ET SCAN"
+      - "NMAP"
+      - "Masscan"
+      - "ZMap"
+    action: "block_ip"
+    ttl: 600                  # Chặn 10 phút (Scan thường đổi IP nhanh, ko cần chặn lâu)
+
+  # 5. Malware & C2 (Command & Control)
+  - name: "Malware / C2 Communication"
+    keywords: 
+      - "C2"
+      - "Command and Control"
+      - "Beacon"
+      - "Trojan"
+      - "Malware"
+    action: "block_ip"
+    ttl: 86400
+    quarantine: true
+    quarantine_dst: true      # Quan trọng: Chặn luôn IP đích (Server C2) để ngắt kết nối
+    
+   # 6. Brute force
+  - name: "Brute force"
+    keywords: 
+      - "Brute Force"
+      - "Brute"
+    action: "block_ip"
+    ttl: 86400
+    
+   # 7. LFI/RFI detection
+  - name: "LFI/RFI detection"
+    keywords: 
+      - "Local File Inclusion"
+      - "Remote File Inclusion"
+      - "etc/passwd"
+    action: "block_ip"
+    ttl: 86400
+
+   # 8. DoS
+  - name: "DoS"
+    keywords: 
+      - "DoS"
+    action: "block_ip"
+    ttl: 86400
+    quarantine: true
+    quarantine_dst: true
+    
+    # 9. Malicious File Upload detection
+  - name: "Malicious File Upload detection"
+    keywords: 
+      - "HTTP POST"
+      - "System Command"
+    action: "block_ip"
+    ttl: 86400
