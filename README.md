@@ -1,4 +1,4 @@
-# Hệ thống IDS/IPS sử dụng mã nguồn mở
+# Intrusion Detection and Response System (IDR System)
 
 ## 📋 Tổng Quan Dự án
 
